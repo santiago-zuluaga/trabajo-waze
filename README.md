@@ -1,152 +1,93 @@
-# Trabajo Waze
+# Waze IA — rutas A* Balanced para Medellín
 
-Este proyecto analiza la red vial de La Estrella, Antioquia, con datos de OpenStreetMap y calcula rutas mediante una implementación propia del algoritmo A*.
-
-- `WAZE_IA_CORRECCION.ipynb` es la versión principal. Implementa la búsqueda con la estructura de `Node` y `Tree`: `OSMRouteNode` adapta cada estado a la red vial, calcula costos y heurísticas y conserva su nodo padre, mientras `OSMRouteTree` utiliza el algoritmo A* heredado de `Tree` para encontrar la mejor ruta.
-- `Waze_IA.ipynb` realiza la misma búsqueda y utiliza el mismo modelo de costos, pero implementa A* directamente en `OSMRouteMap` y `CompositeOSMRouteMap`. En lugar de objetos enlazados mediante padres, administra los mejores costos y la reconstrucción de la ruta con los diccionarios `g_score` y `came_from`.
-
-El entorno se administra con [uv](https://docs.astral.sh/uv/). El proyecto está fijado a Python 3.11 y las versiones reproducibles de las dependencias se encuentran en `uv.lock`.
+Proyecto académico de navegación sobre la red vial dirigida de OpenStreetMap. La notebook principal compara A* por tiempo con A* Balanced, que agrega una penalización horaria basada en siniestros históricos oficiales de Medellín. Si no encuentra el dataset, Balanced queda desactivado y el notebook no inventa eventos.
 
 ## Requisitos
 
-- Git.
-- Visual Studio Code.
-- Las extensiones [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python) y [Jupyter](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter) de Microsoft para VS Code.
-- Conexión a internet para instalar las dependencias y consultar OpenStreetMap y Nominatim.
+- Windows 10/11, Linux, Google Colab o Jupyter.
+- Python 3.12 recomendado. Python 3.11 también está soportado.
+- `uv` para crear el entorno local reproducible. En Colab, la primera celda instala el proyecto y sus dependencias automáticamente.
+- Internet para instalar paquetes y descargar la red vial de OpenStreetMap. El mapa base también requiere acceso a internet.
 
-No es necesario instalar Python manualmente: `uv` puede descargar la versión 3.11 indicada en `.python-version`.
+Las dependencias se definen en `pyproject.toml`; `uv.lock` conserva la resolución reproducible. Los dos módulos propios se instalan como parte del proyecto. No mantenemos un `requirements.txt` duplicado.
 
-## 1. Clonar el repositorio
+## Clonar en otro PC (Windows PowerShell)
 
-```bash
-git clone URL_DEL_REPOSITORIO
-cd trabajo-waze
-```
-
-Reemplaza `URL_DEL_REPOSITORIO` por la dirección HTTPS o SSH del repositorio en GitHub.
-
-## 2. Instalar uv
-
-Si ya tienes `uv`, comprueba la instalación:
-
-```bash
-uv --version
-```
-
-Si el comando no existe, instálalo siguiendo una de estas opciones.
-
-### macOS o Linux
-
-Instalador oficial:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-En macOS también puedes utilizar Homebrew:
-
-```bash
-brew install uv
-```
-
-### Windows
-
-Ejecuta en PowerShell:
+Instala Git y [uv](https://docs.astral.sh/uv/getting-started/installation/), luego ejecuta:
 
 ```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+git clone https://github.com/santiago-zuluaga/trabajo-waze.git
+cd trabajo-waze
+uv sync --extra notebook --extra test
+uv run python scripts/acquire_incidents.py
+uv run python scripts/verify_incidents.py
+uv run python -m pytest tests -v
+uv run jupyter lab WAZE_IA_CORRECCION.ipynb
 ```
 
-Después de la instalación, cierra y abre nuevamente la terminal y verifica:
+`uv` instala Python 3.12 si no está disponible, crea `.venv` y sincroniza las versiones fijadas en `uv.lock`. En VS Code también puedes abrir la carpeta y seleccionar el kernel `.venv\Scripts\python.exe`.
 
-```bash
-uv --version
+En Linux/macOS el mismo flujo funciona; el intérprete del kernel queda en `.venv/bin/python`.
+
+## Google Colab
+
+Abre [WAZE_IA_CORRECCION.ipynb en Google Colab](https://colab.research.google.com/github/santiago-zuluaga/trabajo-waze/blob/main/WAZE_IA_CORRECCION.ipynb) y selecciona **Entorno de ejecución → Ejecutar todas**. La primera celda clona este repositorio a `/content/trabajo-waze`, instala el proyecto desde `pyproject.toml` y agrega la raíz al import path. No necesitas cargar manualmente `waze_accidents.py` ni `waze_communes.py`.
+
+La descarga de la red de OpenStreetMap requiere que el runtime tenga internet y puede tardar. Colab es temporal: para usar el extracto real, adquiere el archivo en `data/raw/siniestralidad_medellin.geojson` con el script documentado o cópialo a esa ruta durante la sesión. No se sube el GeoJSON crudo al repositorio.
+
+### Estado de verificación portable
+
+Verificado en Windows con Python 3.12: sincronización de dependencias, suite de pruebas y ejecución completa local del notebook con datos reales, polígonos oficiales y grafo OSM. La comparación del inventario en vivo encontró 235.820 de 235.820 IDs. Los resultados experimentales y límites del modelo están en [docs/ACCIDENTES.md](docs/ACCIDENTES.md), [docs/real_route_experiment.csv](docs/real_route_experiment.csv) y [el mapa comparativo](docs/real_route_comparison.html). No se inició un runtime de Colab en esta tarea.
+
+## Ejecutar en Jupyter local
+
+Después de `uv sync --extra notebook --extra test`, abre la carpeta del repositorio en JupyterLab o VS Code y ejecuta `WAZE_IA_CORRECCION.ipynb` de principio a fin. La celda inicial localiza la raíz del checkout, configura imports y cambia a esa carpeta; por eso las rutas de datos y resultados no dependen de la carpeta desde la que se inició Jupyter. No instala paquetes localmente: usa el entorno configurado con `uv sync`.
+
+La red vial se consulta desde OpenStreetMap al ejecutar la celda de OSMnx. Nominatim y los servicios de mapas son recursos externos y pueden limitar o demorar solicitudes. El notebook no guarda sus resultados de ejecución ni credenciales en el archivo.
+
+## Datos reales y demo
+
+La fuente oficial es la capa pública ArcGIS `VM_Accidentes`, documentada en [docs/ACCIDENTES.md](docs/ACCIDENTES.md). Para adquirir el extracto desde la raíz del repositorio:
+
+```powershell
+uv run python scripts/acquire_incidents.py
 ```
 
-Consulta la [guía oficial de instalación de uv](https://docs.astral.sh/uv/getting-started/installation/) si necesitas otro método.
+El descargador guarda el GeoJSON y su manifiesto en `data/raw/`, se niega a sobrescribir archivos existentes y valida el formato/respuesta. `scripts/verify_incidents.py` valida estructura/calidad y compara IDs con la fuente oficial. El extracto de 116,5 MiB está excluido de Git. Si no hay archivo real, Balanced queda deshabilitado.
 
-## 3. Crear el entorno e instalar las dependencias
+El modelo usa `C(e,h)=t(e)(1+beta R(e,h))`; la hora seleccionada se aplica a toda la ruta. Los conteos históricos no equivalen a probabilidad individual de accidente, no están ajustados por exposición o volumen vehicular y no garantizan seguridad. Consulta la documentación para el sesgo por longitud de segmentos, las limitaciones espaciales y la metodología.
 
-Desde la raíz del repositorio ejecuta:
+## Pruebas
 
-```bash
-uv sync
+```powershell
+uv run python -m pytest tests -v
 ```
 
-Este comando:
+La suite cubre validación y asociación espacial, costos por hora, agregación, selección de alternativas, grafos dirigidos, beta cero, destinos inalcanzables y configuración portable. No depende de la API externa. Para comprobar directamente que los módulos se importan:
 
-- Lee Python 3.11 desde `.python-version`.
-- Descarga Python 3.11 si no está disponible.
-- Crea el entorno virtual `.venv`.
-- Instala las dependencias registradas en `pyproject.toml` y `uv.lock`.
-
-Puedes verificar el entorno con:
-
-```bash
-uv run python --version
+```powershell
+uv run python -c "import waze_accidents, waze_communes; print('imports OK')"
 ```
 
-El resultado debe comenzar con `Python 3.11`.
+## Estructura
 
-## 4. Abrir el proyecto en VS Code
-
-1. Abre Visual Studio Code.
-2. Selecciona **File → Open Folder** o **Archivo → Abrir carpeta**.
-3. Abre la carpeta clonada `trabajo-waze`.
-4. Abre el notebook que quieras ejecutar, por ejemplo `Waze_IA.ipynb`.
-
-## 5. Seleccionar el kernel correcto
-
-Con el notebook abierto:
-
-1. Haz clic en **Select Kernel** o **Seleccionar kernel**, en la esquina superior derecha.
-2. Selecciona **Python Environments**.
-3. Elige el intérprete ubicado dentro de `.venv`:
-   - macOS y Linux: `.venv/bin/python`
-   - Windows: `.venv\Scripts\python.exe`
-4. Confirma que VS Code muestre el entorno del proyecto con Python 3.11.
-
-No selecciones un Python global ni un entorno de otro proyecto.
-
-## 6. Ejecutar el notebook
-
-Después de seleccionar el kernel de `.venv`, utiliza el botón **Run All** o **Ejecutar todo** de VS Code. También puedes ejecutar las celdas individualmente mediante el botón de ejecución que aparece junto a cada una, siempre respetando su orden.
-
-La primera ejecución puede tardar mientras OSMnx descarga la red vial de OpenStreetMap. Las consultas de geocodificación realizadas con Nominatim también necesitan conexión a internet y ocasionalmente pueden requerir un nuevo intento si el servicio tarda en responder.
-
-## Solución de problemas
-
-### VS Code no muestra `.venv` como kernel
-
-1. Comprueba que ejecutaste `uv sync` desde la raíz del repositorio.
-2. Verifica que las extensiones Python y Jupyter estén instaladas y habilitadas.
-3. En VS Code, abre la paleta de comandos y selecciona **Python: Select Interpreter**.
-4. Selecciona manualmente `.venv/bin/python` en macOS o Linux, o `.venv\Scripts\python.exe` en Windows.
-5. Si todavía no aparece, ejecuta **Developer: Reload Window** desde la paleta de comandos.
-
-### Falta una dependencia
-
-No instales paquetes con `pip` dentro del notebook. Agrégalos al proyecto desde la terminal:
-
-```bash
-uv add nombre-del-paquete
+```text
+WAZE_IA_CORRECCION.ipynb   Notebook principal (A* con Node/Tree)
+Waze_IA.ipynb              Notebook alternativo conservado
+waze_accidents.py          Carga, validación y asociación de siniestros
+waze_communes.py           Asociación a polígonos y frecuencias por unidad oficial
+scripts/acquire_incidents.py Descarga validada desde ArcGIS
+scripts/verify_incidents.py Verifica extracto y completitud contra ArcGIS
+tests/                      Pruebas offline
+ docs/ACCIDENTES.md         Datos, método y limitaciones
+pyproject.toml              Dependencias, metadatos y módulos instalables
+uv.lock                     Resolución fijada para Python 3.11 y 3.12
 ```
 
-Después reinicia el kernel del notebook en VS Code y vuelve a ejecutar las celdas necesarias.
+## Limitaciones conocidas
 
-### Reconstruir el entorno
-
-Si el entorno quedó desactualizado o fue eliminado, vuelve a ejecutar:
-
-```bash
-uv sync
-```
-
-La carpeta `.venv` es local y no debe subirse a GitHub. El archivo `uv.lock` sí debe mantenerse en el repositorio para que otros usuarios obtengan las mismas versiones de las dependencias.
-
----
-## Referencias
-
-### Fundamento de los ajustes de tiempo
-
-Las penalizaciones por intersecciones, movimientos de giro y complejidad vial fueron extraídos de estudios de la [Federal Highway Administration (FHWA)](https://ops.fhwa.dot.gov/publications/fhwahop08024/chapter3.htm), [Transportation Research Part B](https://doi.org/10.1016/0191-2615(96)00001-X) y la [American Society of Civil Engineers (ASCE)](https://doi.org/10.1061/9780784483053.224).
+- El GeoJSON crudo y el grafo descargado se excluyen de Git; cada persona debe adquirirlos con la fuente documentada.
+- Balanced usa frecuencia por comuna/corregimiento, por lo que no distingue calles diferentes dentro de la misma unidad.
+- El primer cálculo del grafo necesita red y los servicios externos pueden fallar o cambiar.
+- No hay denominador de exposición vehicular; el modelo no estima riesgo por vehículo ni probabilidad de accidente.
+- La hora se mantiene fija durante el recorrido y la correspondencia espacial es aproximada.

@@ -9,3 +9,19 @@ wheels/
 # Virtual environments
 .venv
 .env
+.env.*
+!.env.example
+
+# Extractos geográficos locales (100+ MB); adquirir con el script documentado.
+data/raw/
+
+# Jupyter, test, and dependency caches
+.ipynb_checkpoints/
+.pytest_cache/
+.uv-cache/
+cache/
+
+# Derived local outputs
+data/processed/
+reports/
+*.part
